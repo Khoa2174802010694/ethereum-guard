@@ -1,32 +1,26 @@
 
-# Python
+# Python cache
 __pycache__/
 *.py[cod]
 *.pyd
 .pytest_cache/
 .mypy_cache/
 
-# Virtual environment
+# Virtual environments
 .venv/
 venv/
 env/
 
-# Jupyter
-.ipynb_checkpoints/
-
-# Environment variables
+# Environment variables and secrets
 .env
 .env.*
 !.env.example
 
-# Generated data
-data/raw/
-data/processed/
-data/sample/
+# Jupyter temporary files
+.ipynb_checkpoints/
 
-# Model artifacts
-artifacts/checkpoints/
-artifacts/scalers/
+# Local backups
+artifacts/backup_before_feature_rebuild/
 
 # IDE
 .vscode/
@@ -38,3 +32,10 @@ Thumbs.db
 
 # Local backups
 artifacts/backup_before_feature_rebuild/
+artifacts/backup_before_tv1_fix/
+
+# Large local sample data
+data/sample/*.parquet
+data/sample/*.csv
+# Local datasets and generated pipeline outputs
+data/

@@ -36,8 +36,12 @@ OUTPUT_DIR = PROJECT_ROOT / "data" / "processed" / "address_registry"
 REPORT_PATH = PROJECT_ROOT / "artifacts" / "results" / "address_registry_report.json"
 
 BATCH_SIZE = 100_000
+LABEL_NORMAL = 0
 LABEL_PHISHING = 1
 LABEL_UNLABELED = -1
+# Optional trusted negative-label source. One address per line; blank lines and
+# lines beginning with # are ignored. Absence of this file means no label 0.
+VERIFIED_BENIGN_FILE = PROJECT_ROOT / "data" / "raw" / "verified_benign_addresses.txt"
 
 
 def normalize_address(value) -> str | None:
@@ -102,6 +106,28 @@ def load_known_phishing_addresses() -> set[str]:
     return addresses
 
 
+def load_verified_benign_addresses() -> set[str]:
+    """Load only explicitly verified benign addresses; never infer from absence."""
+    if not VERIFIED_BENIGN_FILE.exists():
+        return set()
+
+    addresses: set[str] = set()
+    for line_number, raw in enumerate(
+        VERIFIED_BENIGN_FILE.read_text(encoding="utf-8").splitlines(), start=1
+    ):
+        value = raw.strip()
+        if not value or value.startswith("#"):
+            continue
+        address = normalize_address(value)
+        if address is None:
+            raise ValueError(
+                f"Địa chỉ normal không hợp lệ tại "
+                f"{VERIFIED_BENIGN_FILE}:{line_number}"
+            )
+        addresses.add(address)
+    return addresses
+
+
 def main() -> None:
     parquet_files = sorted(TRANSACTIONS_DIR.glob("*.parquet"))
     if not parquet_files:
@@ -110,8 +136,17 @@ def main() -> None:
         )
 
     known_phishing = load_known_phishing_addresses()
+    verified_benign = load_verified_benign_addresses()
+    conflicts = known_phishing & verified_benign
+    if conflicts:
+        examples = sorted(conflicts)[:5]
+        raise ValueError(
+            "Có địa chỉ đồng thời nằm trong danh sách phishing và normal "
+            f"đã xác minh. Cần giải quyết xung đột trước: {examples}"
+        )
 
-    # Per-address aggregates. We deliberately do not create label 0.
+    # Per-address aggregates. Label 0 is assigned only from the explicit,
+    # trusted verified-benign file. Missing from MDBChain is NOT enough.
     stats = defaultdict(
         lambda: {
             "tx_sent_count": 0,
@@ -200,11 +235,22 @@ def main() -> None:
     rows = []
     for address, item in stats.items():
         is_phishing = address in known_phishing
+        is_verified_benign = address in verified_benign
+        label = (
+            LABEL_PHISHING if is_phishing
+            else LABEL_NORMAL if is_verified_benign
+            else LABEL_UNLABELED
+        )
+        label_source = (
+            "MDBChain_filename" if is_phishing
+            else "verified_benign_addresses.txt" if is_verified_benign
+            else None
+        )
         rows.append(
             {
                 "address": address,
-                "label": LABEL_PHISHING if is_phishing else LABEL_UNLABELED,
-                "label_source": "MDBChain_filename" if is_phishing else None,
+                "label": label,
+                "label_source": label_source,
                 "tx_sent_count": item["tx_sent_count"],
                 "tx_received_count": item["tx_received_count"],
                 "total_tx_count": (
@@ -240,25 +286,34 @@ def main() -> None:
     phishing_in_sample = sum(
         1 for address in stats if address in known_phishing
     )
-    unlabeled_in_sample = len(stats) - phishing_in_sample
+    normal_in_sample = sum(
+        1 for address in stats if address in verified_benign
+    )
+    unlabeled_in_sample = len(stats) - phishing_in_sample - normal_in_sample
 
     report = {
         "status": "success",
         "label_policy": {
             "1": "Known phishing address found in MDBChain filename list",
-            "-1": "Unlabeled; not verified benign",
-            "0": "Not assigned because no verified-benign source is available",
+            "0": "Address explicitly listed in verified_benign_addresses.txt",
+            "-1": "Unlabeled; not verified benign or phishing",
         },
         "inputs": {
             "transaction_files": files_processed,
             "mdbchain_directory": str(MDBCHAIN_DIR),
             "known_phishing_addresses_in_source": len(known_phishing),
+            "verified_benign_file": (
+                str(VERIFIED_BENIGN_FILE) if VERIFIED_BENIGN_FILE.exists() else None
+            ),
+            "verified_benign_addresses_in_source": len(verified_benign),
         },
         "summary": {
             "total_transactions_scanned": total_transactions,
             "unique_addresses_in_sample": len(stats),
             "known_phishing_addresses_found_in_sample": phishing_in_sample,
+            "verified_benign_addresses_found_in_sample": normal_in_sample,
             "unlabeled_addresses_in_sample": unlabeled_in_sample,
+            "binary_metrics_ready": bool(phishing_in_sample > 0 and normal_in_sample > 0),
             "transactions_involving_known_phishing_addresses": (
                 transactions_involving_known_phishing
             ),
@@ -269,7 +324,8 @@ def main() -> None:
         "output": str(output_path),
         "note": (
             "The registry is limited to addresses observed in the processed "
-            "transaction samples. Label -1 means unlabeled, not benign. "
+            "transaction samples. Label 0 is assigned only from the explicit "
+            "verified-benign file. Label -1 means unlabeled, not benign. "
             "The transaction count involving known phishing addresses is "
             "not a count of independently verified phishing transactions."
         ),

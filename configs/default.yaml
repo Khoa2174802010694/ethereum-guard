@@ -1,7 +1,8 @@
-
 project:
   name: ethereum-guard
   random_seed: 42
+  seed: 42
+  device: auto
 
 data:
   source: vnegi10/Ethereum_blockchain_parquet
@@ -26,3 +27,34 @@ output:
   artifacts_dir: artifacts
   results_dir: artifacts/results
   checkpoints_dir: artifacts/checkpoints
+
+model:
+  name: tgae
+  hidden_dim: 128
+  latent_dim: 64
+  dropout: 0.2
+  use_tabular: true
+  use_graph: true
+  use_temporal: true
+  graph_neighbor_samples: [15, 10]
+  loss_weights:
+    alpha_feature: 0.4
+    beta_graph: 0.3
+    gamma_temporal: 0.3
+  contrastive_margin: 5.0
+  supervised_aux_weight: 0.2
+
+training:
+  batch_size: 512
+  lr: 0.001
+  weight_decay: 0.0001
+  epochs: 60
+  early_stopping_patience: 10
+  use_amp: true
+
+# Explicit protocol: unlabeled addresses are never treated as normal.
+labels:
+  normal: 0
+  anomaly: 1
+  unlabeled: -1
+  require_verified_normal_for_binary_metrics: true

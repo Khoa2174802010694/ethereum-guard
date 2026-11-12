@@ -21,8 +21,8 @@ Important:
 - No verified-normal labels are invented. Unknown remains -1.
 - is_contract remains unavailable/unknown; it is not inferred.
 - Graph feature scaler is fit on Train only.
-- The local ego density calculation is exact but can be CPU-intensive on a
-  graph with millions of nodes. Use --skip-ego-density only for a diagnostic
+- The exact local ego density uses Numba-compiled sparse neighborhood
+  intersections; runtime still depends on graph degree distribution. Use --skip-ego-density only for a diagnostic
   run; do not treat that run as final research output.
 """
 
@@ -44,8 +44,16 @@ import scipy.sparse as sp
 import torch
 import yaml
 from sklearn.preprocessing import RobustScaler
+from src.pipeline.feature_transform import transform_feature_frame
 from torch_geometric.data import Data
-from numba import njit
+
+try:
+    from numba import njit
+except ImportError as exc:
+    raise ImportError(
+        "Thiếu numba để tính local_ego_density hiệu quả. "
+        "Cài bằng: pip install numba"
+    ) from exc
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -188,17 +196,18 @@ def build_local_mapping(node_frame: pd.DataFrame) -> tuple[dict[str, int], np.nd
 
 @njit(cache=True)
 def _accumulate_ego_edge_counts(
-    indptr,
-    indices,
-    src,
-    dst,
-    counts,
-):
+    indptr: np.ndarray,
+    indices: np.ndarray,
+    src: np.ndarray,
+    dst: np.ndarray,
+    counts: np.ndarray,
+) -> None:
     """
-    Đếm số cạnh có hướng nằm trong ego graph của từng node.
+    For each directed edge u->w, increment every center v whose closed
+    undirected neighborhood contains both u and w.
 
-    Sử dụng giao hai danh sách láng giềng đã sắp xếp
-    trong CSR, được Numba biên dịch.
+    This is equivalent to counting directed edges induced by each closed
+    1-hop ego set, but avoids constructing a sparse submatrix per node.
     """
     for edge_pos in range(src.shape[0]):
         u = src[edge_pos]
@@ -206,107 +215,81 @@ def _accumulate_ego_edge_counts(
 
         i = indptr[u]
         i_end = indptr[u + 1]
-
         j = indptr[w]
         j_end = indptr[w + 1]
 
+        # CSR rows are sorted. Two-pointer intersection runs in compiled code.
         while i < i_end and j < j_end:
             left = indices[i]
             right = indices[j]
-
             if left == right:
                 counts[left] += 1
                 i += 1
                 j += 1
-
             elif left < right:
                 i += 1
-
             else:
                 j += 1
 
 
 def compute_local_ego_density_exact(
-    src,
-    dst,
-    num_nodes,
-    chunk_size=100_000,
-):
+    src: np.ndarray,
+    dst: np.ndarray,
+    num_nodes: int,
+    chunk_size: int = 100_000,
+) -> tuple[np.ndarray, dict[str, Any]]:
     """
-    Tính chính xác directed 1-hop ego density.
+    Exact directed 1-hop ego density using sparse closed-neighborhood
+    intersections and Numba-compiled two-pointer loops.
 
-    Ego neighborhood:
-    - Các node có cạnh đi vào node trung tâm.
-    - Các node có cạnh đi ra từ node trung tâm.
-    - Bao gồm chính node trung tâm.
+    Let U be the undirected projection of the graph with self-membership
+    added. For each directed edge u->w, every center in
+    U[u] intersect U[w] contains that edge in its induced ego graph.
+    Counting these contributions gives the exact number of directed
+    induced edges for every ego center.
 
-    Công thức:
-        density = induced_directed_edges / (k * (k - 1))
-
-    Trong đó k là số node trong ego neighborhood.
+    Complexity is proportional to the sum of closed-neighborhood
+    intersection lengths over directed edges, rather than repeated SciPy
+    sparse slicing for every node.
     """
-
     src = np.asarray(src, dtype=np.int64)
     dst = np.asarray(dst, dtype=np.int64)
 
     if src.size != dst.size:
-        raise ValueError("src và dst phải cùng kích thước.")
-
+        raise ValueError("src và dst phải có cùng số phần tử.")
     if src.size == 0:
         return np.zeros(num_nodes, dtype=np.float32), {
             "ego_density_computed": True,
             "ego_nodes_processed": 0,
             "ego_edges_counted": 0,
-            "algorithm": "numba_sparse_intersection",
+            "algorithm": "numba_sparse_closed_neighborhood_intersection",
         }
 
-    # Tạo đồ thị vô hướng chỉ để xác định membership
-    # của 1-hop neighborhood.
-    # Cạnh gốc vẫn giữ nguyên hướng khi tính density.
-
-    rows = np.concatenate((src, dst))
-    cols = np.concatenate((dst, src))
-
+    # U is the undirected projection used only to define 1-hop membership.
+    # A remains directed: every original u->w edge contributes once.
+    undirected_rows = np.concatenate((src, dst))
+    undirected_cols = np.concatenate((dst, src))
     undirected = sp.csr_matrix(
         (
-            np.ones(len(rows), dtype=np.uint8),
-            (rows, cols),
+            np.ones(undirected_rows.size, dtype=np.uint8),
+            (undirected_rows, undirected_cols),
         ),
         shape=(num_nodes, num_nodes),
         dtype=np.uint8,
     )
-
     undirected.data[:] = 1
     undirected.setdiag(1)
     undirected.data[:] = 1
     undirected.eliminate_zeros()
     undirected.sort_indices()
 
-    indptr = np.asarray(
-        undirected.indptr,
-        dtype=np.int64,
-    )
+    indptr = np.asarray(undirected.indptr, dtype=np.int64)
+    indices = np.asarray(undirected.indices, dtype=np.int64)
+    counts = np.zeros(num_nodes, dtype=np.int64)
 
-    indices = np.asarray(
-        undirected.indices,
-        dtype=np.int64,
-    )
-
-    counts = np.zeros(
-        num_nodes,
-        dtype=np.int64,
-    )
-
-    total_edges = len(src)
-
-    # Xử lý theo batch để kiểm soát bộ nhớ.
+    total_edges = int(src.size)
     for begin in range(0, total_edges, chunk_size):
-
-        finish = min(
-            begin + chunk_size,
-            total_edges,
-        )
-
+        finish = min(begin + chunk_size, total_edges)
         _accumulate_ego_edge_counts(
             indptr,
             indices,
@@ -314,123 +297,99 @@ def compute_local_ego_density_exact(
             dst[begin:finish],
             counts,
         )
-
         LOG.info(
-            "local_ego_density: processed %s/%s edges",
-            f"{finish:,}",
-            f"{total_edges:,}",
+            "local_ego_density: processed directed edges %s/%s",
+            f"{finish:,}", f"{total_edges:,}",
         )
 
-    # Kích thước closed neighborhood của từng node.
     ego_sizes = np.diff(indptr).astype(np.float64)
-
     denominators = ego_sizes * (ego_sizes - 1.0)
-
     density = np.divide(
         counts,
         denominators,
-        out=np.zeros(
-            num_nodes,
-            dtype=np.float64,
-        ),
+        out=np.zeros(num_nodes, dtype=np.float64),
         where=denominators > 0,
     )
-
-    density = np.clip(
-        density,
-        0.0,
-        1.0,
-    ).astype(np.float32)
+    density = np.clip(density, 0.0, 1.0).astype(np.float32)
 
     stats = {
         "ego_density_computed": True,
-        "ego_nodes_processed": int(
-            np.count_nonzero(ego_sizes > 1)
-        ),
+        "ego_nodes_processed": int(np.count_nonzero(ego_sizes > 1)),
         "ego_edges_counted": int(counts.sum()),
-        "algorithm": "numba_sparse_intersection",
+        "algorithm": "numba_sparse_closed_neighborhood_intersection",
         "definition": (
-            "Directed induced 1-hop ego density; "
-            "closed undirected neighborhood membership; "
-            "original directed edges as numerator; "
-            "denominator k*(k-1); self-loops excluded."
+            "Exact directed induced 1-hop ego density. Ego membership uses "
+            "the undirected 1-hop neighborhood plus the center; numerator "
+            "counts original directed edges induced by that set; self-loops "
+            "excluded; denominator k*(k-1)."
         ),
         "chunk_size": int(chunk_size),
     }
-
     del undirected
-
     return density, stats
 
 
+def _self_test_ego_density() -> None:
+    """Compare optimized result against the straightforward sparse reference."""
+    n = 7
+    src = np.asarray([0, 0, 1, 1, 2, 3, 4, 5, 6], dtype=np.int64)
+    dst = np.asarray([1, 2, 2, 3, 3, 4, 5, 6, 0], dtype=np.int64)
+
+    actual, _ = compute_local_ego_density_exact(src, dst, n, chunk_size=3)
+
+    adjacency = sp.csr_matrix(
+        (np.ones(src.size, dtype=np.uint8), (src, dst)),
+        shape=(n, n),
+    )
+    adjacency.data[:] = 1
+    undirected = adjacency.maximum(adjacency.T).tocsr()
+    undirected.setdiag(1)
+    undirected.data[:] = 1
+    undirected.sort_indices()
+
+    expected = np.zeros(n, dtype=np.float64)
+    for node in range(n):
+        ego = undirected.indices[
+            undirected.indptr[node]:undirected.indptr[node + 1]
+        ]
+        k = len(ego)
+        if k > 1:
+            expected[node] = (
+                adjacency[ego, :][:, ego].nnz / (k * (k - 1))
+            )
+
+    if not np.allclose(actual, expected, atol=1e-7):
+        raise AssertionError(
+            f"Ego density self-test failed: actual={actual}, expected={expected}"
+        )
+    print("Ego density self-test: PASS")
+    print("Optimized:", np.round(actual, 6).tolist())
+    print("Reference:", np.round(expected, 6).tolist())
+
+
 def graph_topology_features(
-    edges,
-    address_to_local,
-    num_nodes,
-    compute_ego_density,
-):
-    """Tính 6 Graph Topology Features."""
+    edges: pd.DataFrame,
+    address_to_local: dict[str, int],
+    num_nodes: int,
+    compute_ego_density: bool,
+) -> tuple[np.ndarray, dict[str, Any]]:
+    """Return six topology features in local node-table order."""
+    src = edges["src"].to_numpy(dtype=np.int64, copy=True)
+    dst = edges["dst"].to_numpy(dtype=np.int64, copy=True)
+    tx_count = edges["tx_count"].to_numpy(dtype=np.float64, copy=True)
 
-    src = edges["src"].to_numpy(
-        dtype=np.int64,
-        copy=True,
-    )
+    out_degree = np.bincount(src, weights=tx_count, minlength=num_nodes)
+    in_degree = np.bincount(dst, weights=tx_count, minlength=num_nodes)
 
-    dst = edges["dst"].to_numpy(
-        dtype=np.int64,
-        copy=True,
-    )
+    unique_out = np.bincount(src, minlength=num_nodes).astype(np.float64)
+    unique_in = np.bincount(dst, minlength=num_nodes).astype(np.float64)
 
-    tx_count = edges["tx_count"].to_numpy(
-        dtype=np.float64,
-        copy=True,
-    )
-
-    # Degree tính theo số lượng giao dịch.
-    out_degree = np.bincount(
-        src,
-        weights=tx_count,
-        minlength=num_nodes,
-    )
-
-    in_degree = np.bincount(
-        dst,
-        weights=tx_count,
-        minlength=num_nodes,
-    )
-
-    # Số lượng láng giềng khác nhau.
-    unique_out = np.bincount(
-        src,
-        minlength=num_nodes,
-    ).astype(np.float64)
-
-    unique_in = np.bincount(
-        dst,
-        minlength=num_nodes,
-    ).astype(np.float64)
-
-    # Neighbor repeat ratio.
     total_tx = out_degree + in_degree
-
     unique_total = unique_out + unique_in
+    repeat_ratio = 1.0 - unique_total / (total_tx + 1.0)
+    repeat_ratio = np.clip(repeat_ratio, 0.0, 1.0)
 
-    repeat_ratio = (
-        1.0 - unique_total / (total_tx + 1.0)
-    )
-
-    repeat_ratio = np.clip(
-        repeat_ratio,
-        0.0,
-        1.0,
-    )
-
-    # Local ego density.
-    density = np.zeros(
-        num_nodes,
-        dtype=np.float32,
-    )
-
+    density = np.zeros(num_nodes, dtype=np.float32)
     ego_stats = {
         "ego_density_computed": False,
         "ego_nodes_processed": 0,
@@ -438,7 +397,6 @@ def graph_topology_features(
     }
 
     if compute_ego_density:
-
         density, ego_stats = compute_local_ego_density_exact(
             src=src,
             dst=dst,
@@ -458,12 +416,10 @@ def graph_topology_features(
         **ego_stats,
         "degree_definition": (
             "in_degree/out_degree count transaction multiplicity; "
-            "unique_in/out_neighbors count distinct counterparties."
+            "unique_in/out_neighbors count distinct directed counterparties."
         ),
     }
-
     return features, stats
-
 
 
 def build_pyg_snapshot(
@@ -557,25 +513,39 @@ def build_pyg_snapshot(
     feature_array = feature_frame.to_numpy(dtype=np.float32, copy=True)
     feature_tensor = torch.from_numpy(feature_array)
 
-    temporal_payload = torch.load(
-        temporal_path, map_location="cpu", weights_only=False
-    )
+    temporal_payload = torch.load(temporal_path, map_location="cpu", weights_only=False)
+    if isinstance(temporal_payload, dict):  # backward compatibility with old artifacts
+        temporal_sequence = temporal_payload["sequence"].float()
+        payload_addresses = temporal_payload.get("addresses")
+    else:
+        temporal_sequence = temporal_payload.float()
+        metadata_path = feature_dir / split / "temporal_metadata.pt"
+        metadata = torch.load(metadata_path, map_location="cpu", weights_only=False) if metadata_path.exists() else {}
+        payload_addresses = metadata.get("addresses")
 
-    # Assert temporal sequence row order aligns with the node Parquet.
-    payload_addresses = temporal_payload.get("addresses")
-    if payload_addresses is not None:
-        if list(payload_addresses) != node_frame["address"].astype(str).tolist():
-            raise ValueError(
-                f"Temporal address order không khớp nodes.parquet ({split})."
-            )
+    if payload_addresses is not None and list(payload_addresses) != node_frame["address"].astype(str).tolist():
+        raise ValueError(f"Temporal address order không khớp nodes.parquet ({split}).")
 
     labels = node_frame["label"].to_numpy(dtype=np.int64, copy=True)
-    if "eval_mask" in node_frame.columns:
-        eval_mask = node_frame["eval_mask"].fillna(False).to_numpy(dtype=bool)
-    else:
-        eval_mask = labels >= 0
 
-    temporal_sequence = temporal_payload["sequence"].float()
+    # Always derive masks from the canonical three-state label contract.
+    # Do not trust a stale eval_mask column from an older feature artifact.
+    positive_mask = labels == 1
+    negative_mask = labels == 0
+    unlabeled_mask = labels == -1
+    invalid_label_mask = ~(positive_mask | negative_mask | unlabeled_mask)
+    if invalid_label_mask.any():
+        invalid_values = np.unique(labels[invalid_label_mask]).tolist()
+        raise ValueError(
+            f"Label không hợp lệ trong {split}: {invalid_values}; "
+            "chỉ chấp nhận -1, 0, 1."
+        )
+
+    # eval_mask contains only explicitly labeled examples. Metric consumers
+    # must additionally check that both classes are present before ROC-AUC/F1.
+    eval_mask = positive_mask | negative_mask
+    binary_metrics_ready = bool(positive_mask.any() and negative_mask.any())
+
     if temporal_sequence.shape[0] != num_nodes:
         raise ValueError(
             f"Temporal sequence/node count mismatch ({split}): "
@@ -596,7 +566,11 @@ def build_pyg_snapshot(
         if "is_inductive_holdout" in node_frame.columns
         else np.zeros(num_nodes, dtype=bool)
     )
+    data.positive_mask = torch.from_numpy(positive_mask.copy())
+    data.negative_mask = torch.from_numpy(negative_mask.copy())
+    data.unlabeled_mask = torch.from_numpy(unlabeled_mask.copy())
     data.eval_mask = torch.from_numpy(eval_mask.copy())
+    data.binary_metrics_ready = binary_metrics_ready
     data.x_tab = torch.from_numpy(feature_array[:, :len(TABULAR_FEATURES)].copy())
     graph_start = len(TABULAR_FEATURES)
     graph_end = graph_start + len(GRAPH_FEATURES)
@@ -624,6 +598,14 @@ def build_pyg_snapshot(
         "node_features_shape": list(data.x.shape),
         "temporal_sequence_shape": list(data.temporal_seq.shape),
         "eval_nodes": int(data.eval_mask.sum().item()),
+        "positive_nodes": int(data.positive_mask.sum().item()),
+        "verified_negative_nodes": int(data.negative_mask.sum().item()),
+        "unlabeled_nodes": int(data.unlabeled_mask.sum().item()),
+        "binary_metrics_ready": binary_metrics_ready,
+        "evaluation_status": (
+            "READY" if binary_metrics_ready
+            else "INSUFFICIENT_VERIFIED_CLASSES"
+        ),
         "x_tab_shape": list(data.x_tab.shape),
         "x_topo_shape": list(data.x_topo.shape),
         "x_temp_stat_shape": list(data.x_temp_stat.shape),
@@ -661,11 +643,12 @@ def fit_graph_scaler(
         .replace([np.inf, -np.inf], np.nan)
         .fillna(0.0)
     )
+    values = transform_feature_frame(values, GRAPH_FEATURES)
     scaler = RobustScaler()
     scaler.fit(values)
     scaler_path.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(
-        {"scaler": scaler, "columns": GRAPH_FEATURES},
+        {"scaler": scaler, "columns": GRAPH_FEATURES, "transform": "master_plan_log10_v1"},
         scaler_path,
     )
 
@@ -677,6 +660,7 @@ def fit_graph_scaler(
             .replace([np.inf, -np.inf], np.nan)
             .fillna(0.0)
         )
+        raw = transform_feature_frame(raw, GRAPH_FEATURES)
         frame.loc[:, GRAPH_FEATURES] = scaler.transform(raw)
         frame.to_parquet(nodes_path, index=False, compression="zstd")
 
@@ -713,80 +697,6 @@ def fit_graph_scaler(
     }
 
 
-def _self_test_ego_density():
-    """So sánh thuật toán Numba với phép tính sparse trực tiếp."""
-
-    n = 7
-
-    src = np.asarray(
-        [0, 0, 1, 1, 2, 3, 4, 5, 6],
-        dtype=np.int64,
-    )
-
-    dst = np.asarray(
-        [1, 2, 2, 3, 3, 4, 5, 6, 0],
-        dtype=np.int64,
-    )
-
-    actual, _ = compute_local_ego_density_exact(
-        src,
-        dst,
-        n,
-        chunk_size=3,
-    )
-
-    adjacency = sp.csr_matrix(
-        (
-            np.ones(src.size, dtype=np.uint8),
-            (src, dst),
-        ),
-        shape=(n, n),
-    )
-
-    adjacency.data[:] = 1
-
-    undirected = adjacency.maximum(
-        adjacency.T
-    ).tocsr()
-
-    undirected.setdiag(1)
-    undirected.data[:] = 1
-    undirected.sort_indices()
-
-    expected = np.zeros(
-        n,
-        dtype=np.float64,
-    )
-
-    for node in range(n):
-
-        ego = undirected.indices[
-            undirected.indptr[node]:
-            undirected.indptr[node + 1]
-        ]
-
-        k = len(ego)
-
-        if k > 1:
-            expected[node] = (
-                adjacency[ego, :][:, ego].nnz
-                / (k * (k - 1))
-            )
-
-    if not np.allclose(
-        actual,
-        expected,
-        atol=1e-7,
-    ):
-        raise AssertionError(
-            f"Self-test failed: {actual} != {expected}"
-        )
-
-    print("Ego density self-test: PASS")
-    print("Optimized:", np.round(actual, 6).tolist())
-    print("Reference:", np.round(expected, 6).tolist())
-
-
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Ethereum Guard TV1-05 directed graph construction"
@@ -797,19 +707,16 @@ def main() -> None:
         action="store_true",
         help="Diagnostic only: set local_ego_density to zero; not final output.",
     )
-
     parser.add_argument(
         "--self-test-ego-density",
         action="store_true",
-        help="Test exact ego density on a tiny graph.",
+        help="Run a tiny exactness test without reading project datasets.",
     )
-
     args = parser.parse_args()
 
     if args.self_test_ego_density:
         _self_test_ego_density()
         return
-
 
     cfg = load_config(args.config.resolve())
     processed = ROOT / cfg["processed_dir"]
@@ -874,6 +781,7 @@ def main() -> None:
         "snapshot_fields": [
             "x", "x_tab", "x_topo", "x_temp_stat", "temporal_seq",
             "edge_index", "edge_attr", "edge_timestamp", "y", "eval_mask",
+            "positive_mask", "negative_mask", "unlabeled_mask",
             "node_id", "addresses",
         ],
         "edge_features": EDGE_FEATURES,

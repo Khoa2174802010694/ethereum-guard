@@ -230,7 +230,10 @@ def compute_wallet_features(
         compute_tabular_and_temporal,
         normalize_transactions,
         SEQUENCE_COLUMNS,
+        TABULAR,
+        TEMPORAL_STATS,
     )
+    from src.pipeline.feature_transform import transform_feature_frame
     import joblib
     tx = normalize_transactions(transactions)
     cutoff = int(tx["timestamp"].max())
@@ -288,6 +291,7 @@ def compute_wallet_features(
                 [[0.0 if pd.isna(raw.get(col)) else float(raw.get(col)) for col in columns]],
                 columns=columns,
             )
+            values = transform_feature_frame(values, columns)
             transformed = scaler.transform(values)[0]
             scaled_record = {
                 col: float(value) for col, value in zip(columns, transformed)

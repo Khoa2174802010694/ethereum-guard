@@ -123,7 +123,7 @@ def read_transactions(paths: list[Path], columns: list[str]) -> pd.DataFrame:
         del table
     if not frames:
         return pd.DataFrame(columns=columns)
-    frame = pd.concat(frames, ignore_index=True)
+    frame = pd.concat(frames, ignore_index=True, copy=False)
     del frames
     return frame
 
@@ -201,7 +201,7 @@ def compute_tabular_and_temporal(
         raise ValueError("Không có giao dịch trước cutoff.")
 
     outgoing, incoming = make_event_tables(tx)
-    events = pd.concat([outgoing, incoming], ignore_index=True)
+    events = pd.concat([outgoing, incoming], ignore_index=True, copy=False)
     events["is_zero"] = events["value_eth"].eq(0).astype(np.int8)
     events["is_failed"] = (~events["success"]).astype(np.int8)
 
@@ -215,8 +215,7 @@ def compute_tabular_and_temporal(
         zero_count=("is_zero", "sum"),
         failed_count=("is_failed", "sum"),
     )
-    wide = agg.unstack("direction")
-    wide = wide.fillna(0.0)
+    wide = agg.unstack("direction", fill_value=0.0)
     wide.columns = [f"{metric}_{direction}" for metric, direction in wide.columns]
     wide = wide.fillna(0.0)
 
@@ -358,8 +357,7 @@ def compute_tabular_and_temporal(
             count=("value_eth", "size"),
             value_sum=("value_eth", "sum"),
         )
-        .unstack("direction")
-        .fillna(0.0)
+        .unstack("direction", fill_value=0.0)
     )
     directional.columns = [
         f"{metric}_{direction}" for metric, direction in directional.columns
@@ -379,13 +377,10 @@ def compute_tabular_and_temporal(
 
     # Build compact MultiIndex table then scatter into dense tensor.
     seq_table = pd.DataFrame(index=seq_agg.index)
-    # Columns were flattened above to strings such as "count_in".
-    # Looking them up with ("count", "in") silently returned scalar 0.0,
-    # which erased all directional temporal counts and value sums.
-    seq_table["tx_in_count"] = directional.get("count_in", 0.0)
-    seq_table["tx_out_count"] = directional.get("count_out", 0.0)
-    seq_table["val_in_sum"] = directional.get("value_sum_in", 0.0)
-    seq_table["val_out_sum"] = directional.get("value_sum_out", 0.0)
+    seq_table["tx_in_count"] = directional.get(("count", "in"), 0.0)
+    seq_table["tx_out_count"] = directional.get(("count", "out"), 0.0)
+    seq_table["val_in_sum"] = directional.get(("value_sum", "in"), 0.0)
+    seq_table["val_out_sum"] = directional.get(("value_sum", "out"), 0.0)
     seq_table["val_max"] = seq_agg["value_max"]
     seq_table["unique_counterparties"] = seq_agg["unique_counterparties"]
     seq_table["avg_gas_price"] = seq_agg["avg_gas_price"]
@@ -423,12 +418,20 @@ def attach_manifest_and_ids(
     features: pd.DataFrame,
     manifest: pd.DataFrame,
     global_id_map: dict[str, int],
+    split: str,
 ) -> pd.DataFrame:
-    cols = [
+    if split not in {"train", "val", "test"}:
+        raise ValueError(f"Split không hợp lệ khi tạo eval_mask: {split}")
+    active_column = f"seen_in_{split}_period"
+    # active_column is already one of the three seen_in_* columns above.
+    # De-duplicate the selection to avoid pandas returning a DataFrame for
+    # out[active_column] when the same column name is selected twice.
+    cols = list(dict.fromkeys([
         "address", "label", "label_source", "is_inductive_holdout",
         "seen_in_train_period", "seen_in_val_period", "seen_in_test_period",
         "is_inductive_test", "is_new_after_train_cutoff", "is_new_in_test_period",
-    ]
+        active_column,
+    ]))
     meta = manifest[cols].drop_duplicates("address")
     out = features.reset_index().rename(columns={"index": "address"})
     out = out.merge(meta, on="address", how="left", sort=False)
@@ -436,6 +439,12 @@ def attach_manifest_and_ids(
     out["is_inductive_holdout"] = (
         out["is_inductive_holdout"].fillna(False).astype(bool)
     )
+    # active_mask marks nodes observed in this split's target period.
+    # eval_mask is stricter: only explicitly labeled nodes active in this
+    # period are eligible for supervised evaluation. Unlabeled nodes remain
+    # in the graph for unsupervised learning/inference, but not in metrics.
+    out["active_mask"] = out[active_column].fillna(False).astype(bool)
+    out["eval_mask"] = out["active_mask"] & out["label"].isin([0, 1])
     out["node_id"] = out["address"].map(global_id_map).astype(np.int64)
     return out
 
@@ -599,7 +608,7 @@ def main() -> None:
         del tx
 
         features = attach_manifest_and_ids(
-            features, manifest, global_id_map
+            features, manifest, global_id_map, split=split
         )
         addresses = features["address"].reset_index(drop=True)
 
