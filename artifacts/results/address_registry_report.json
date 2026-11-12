@@ -1,0 +1,40 @@
+{
+  "status": "success",
+  "label_policy": {
+    "1": "Known phishing address found in MDBChain filename list",
+    "-1": "Unlabeled; not verified benign",
+    "0": "Not assigned because no verified-benign source is available"
+  },
+  "inputs": {
+    "transaction_files": [
+      {
+        "file": "ethereum__transactions__02640567_to_02765542.parquet",
+        "rows": 37442
+      },
+      {
+        "file": "ethereum__transactions__14666567_to_14791542.parquet",
+        "rows": 909819
+      },
+      {
+        "file": "ethereum__transactions__18416567_to_18541542.parquet",
+        "rows": 753668
+      },
+      {
+        "file": "ethereum__transactions__19416567_to_19541542.parquet",
+        "rows": 917668
+      }
+    ],
+    "mdbchain_directory": "C:\\Users\\minhk\\Downloads\\ethereum-guard\\data\\raw\\mdbchain",
+    "known_phishing_addresses_in_source": 1709
+  },
+  "summary": {
+    "total_transactions_scanned": 2618597,
+    "unique_addresses_in_sample": 1791594,
+    "known_phishing_addresses_found_in_sample": 125,
+    "unlabeled_addresses_in_sample": 1791469,
+    "transactions_involving_known_phishing_addresses": 301,
+    "known_phishing_addresses_not_seen_in_sample": 1584
+  },
+  "output": "C:\\Users\\minhk\\Downloads\\ethereum-guard\\data\\processed\\address_registry\\address_labels.parquet",
+  "note": "The registry is limited to addresses observed in the processed transaction samples. Label -1 means unlabeled, not benign. The transaction count involving known phishing addresses is not a count of independently verified phishing transactions."
+}

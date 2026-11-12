@@ -1,0 +1,311 @@
+{
+  "status": "success",
+  "implementation": "vectorized_pandas_groupby",
+  "feature_count": 25,
+  "implemented_now": {
+    "tabular": [
+      "total_eth_sent",
+      "total_eth_received",
+      "net_balance_diff",
+      "avg_eth_sent",
+      "max_eth_sent",
+      "avg_eth_received",
+      "max_eth_received",
+      "tx_sent_count",
+      "tx_recv_count",
+      "sent_recv_ratio",
+      "zero_val_tx_ratio",
+      "failed_tx_ratio"
+    ],
+    "temporal_statistics": [
+      "active_duration_hours",
+      "tx_frequency_per_day",
+      "mean_inter_tx_time",
+      "std_inter_tx_time",
+      "burstiness_index",
+      "recent_volume_spike_ratio",
+      "recent_tx_spike_ratio"
+    ],
+    "temporal_sequence": [
+      "tx_in_count",
+      "tx_out_count",
+      "val_in_sum",
+      "val_out_sum",
+      "val_max",
+      "unique_counterparties",
+      "avg_gas_price",
+      "mean_inter_arrival_time"
+    ]
+  },
+  "deferred_to_tv1_05_graph_builder": [
+    "in_degree",
+    "out_degree",
+    "unique_in_neighbors",
+    "unique_out_neighbors",
+    "neighbor_repeat_ratio",
+    "local_ego_density"
+  ],
+  "global_node_count": 1791594,
+  "splits": {
+    "train": {
+      "nodes_path": "data\\processed\\features\\train\\nodes.parquet",
+      "temporal_path": "data\\processed\\features\\train\\temporal.pt",
+      "node_rows": 1016762,
+      "sequence_shape": [
+        1016762,
+        10,
+        8
+      ],
+      "cutoff_utc": "2024-03-14T17:53:23+00:00",
+      "transactions_in_history": 1475581,
+      "wallet_side_events": 2949704,
+      "temporal_events": 219761,
+      "temporal_window_coverage": [
+        {
+          "window_index": 0,
+          "start_utc": "2024-03-04T17:53:23+00:00",
+          "end_utc": "2024-03-05T17:53:23+00:00",
+          "has_observed_transactions": false
+        },
+        {
+          "window_index": 1,
+          "start_utc": "2024-03-05T17:53:23+00:00",
+          "end_utc": "2024-03-06T17:53:23+00:00",
+          "has_observed_transactions": false
+        },
+        {
+          "window_index": 2,
+          "start_utc": "2024-03-06T17:53:23+00:00",
+          "end_utc": "2024-03-07T17:53:23+00:00",
+          "has_observed_transactions": false
+        },
+        {
+          "window_index": 3,
+          "start_utc": "2024-03-07T17:53:23+00:00",
+          "end_utc": "2024-03-08T17:53:23+00:00",
+          "has_observed_transactions": false
+        },
+        {
+          "window_index": 4,
+          "start_utc": "2024-03-08T17:53:23+00:00",
+          "end_utc": "2024-03-09T17:53:23+00:00",
+          "has_observed_transactions": false
+        },
+        {
+          "window_index": 5,
+          "start_utc": "2024-03-09T17:53:23+00:00",
+          "end_utc": "2024-03-10T17:53:23+00:00",
+          "has_observed_transactions": false
+        },
+        {
+          "window_index": 6,
+          "start_utc": "2024-03-10T17:53:23+00:00",
+          "end_utc": "2024-03-11T17:53:23+00:00",
+          "has_observed_transactions": false
+        },
+        {
+          "window_index": 7,
+          "start_utc": "2024-03-11T17:53:23+00:00",
+          "end_utc": "2024-03-12T17:53:23+00:00",
+          "has_observed_transactions": true
+        },
+        {
+          "window_index": 8,
+          "start_utc": "2024-03-12T17:53:23+00:00",
+          "end_utc": "2024-03-13T17:53:23+00:00",
+          "has_observed_transactions": true
+        },
+        {
+          "window_index": 9,
+          "start_utc": "2024-03-13T17:53:23+00:00",
+          "end_utc": "2024-03-14T17:53:23+00:00",
+          "has_observed_transactions": true
+        }
+      ]
+    },
+    "val": {
+      "nodes_path": "data\\processed\\features\\val\\nodes.parquet",
+      "temporal_path": "data\\processed\\features\\val\\temporal.pt",
+      "node_rows": 1528608,
+      "sequence_shape": [
+        1528608,
+        10,
+        8
+      ],
+      "cutoff_utc": "2024-03-22T06:50:23+00:00",
+      "transactions_in_history": 2225964,
+      "wallet_side_events": 4450043,
+      "temporal_events": 1036506,
+      "temporal_window_coverage": [
+        {
+          "window_index": 0,
+          "start_utc": "2024-03-12T06:50:23+00:00",
+          "end_utc": "2024-03-13T06:50:23+00:00",
+          "has_observed_transactions": true
+        },
+        {
+          "window_index": 1,
+          "start_utc": "2024-03-13T06:50:23+00:00",
+          "end_utc": "2024-03-14T06:50:23+00:00",
+          "has_observed_transactions": true
+        },
+        {
+          "window_index": 2,
+          "start_utc": "2024-03-14T06:50:23+00:00",
+          "end_utc": "2024-03-15T06:50:23+00:00",
+          "has_observed_transactions": true
+        },
+        {
+          "window_index": 3,
+          "start_utc": "2024-03-15T06:50:23+00:00",
+          "end_utc": "2024-03-16T06:50:23+00:00",
+          "has_observed_transactions": true
+        },
+        {
+          "window_index": 4,
+          "start_utc": "2024-03-16T06:50:23+00:00",
+          "end_utc": "2024-03-17T06:50:23+00:00",
+          "has_observed_transactions": true
+        },
+        {
+          "window_index": 5,
+          "start_utc": "2024-03-17T06:50:23+00:00",
+          "end_utc": "2024-03-18T06:50:23+00:00",
+          "has_observed_transactions": true
+        },
+        {
+          "window_index": 6,
+          "start_utc": "2024-03-18T06:50:23+00:00",
+          "end_utc": "2024-03-19T06:50:23+00:00",
+          "has_observed_transactions": true
+        },
+        {
+          "window_index": 7,
+          "start_utc": "2024-03-19T06:50:23+00:00",
+          "end_utc": "2024-03-20T06:50:23+00:00",
+          "has_observed_transactions": true
+        },
+        {
+          "window_index": 8,
+          "start_utc": "2024-03-20T06:50:23+00:00",
+          "end_utc": "2024-03-21T06:50:23+00:00",
+          "has_observed_transactions": true
+        },
+        {
+          "window_index": 9,
+          "start_utc": "2024-03-21T06:50:23+00:00",
+          "end_utc": "2024-03-22T06:50:23+00:00",
+          "has_observed_transactions": true
+        }
+      ]
+    },
+    "test": {
+      "nodes_path": "data\\processed\\features\\test\\nodes.parquet",
+      "temporal_path": "data\\processed\\features\\test\\temporal.pt",
+      "node_rows": 1791594,
+      "sequence_shape": [
+        1791594,
+        10,
+        8
+      ],
+      "cutoff_utc": "2024-03-29T18:49:23+00:00",
+      "transactions_in_history": 2618597,
+      "wallet_side_events": 5235079,
+      "temporal_events": 1046795,
+      "temporal_window_coverage": [
+        {
+          "window_index": 0,
+          "start_utc": "2024-03-19T18:49:23+00:00",
+          "end_utc": "2024-03-20T18:49:23+00:00",
+          "has_observed_transactions": true
+        },
+        {
+          "window_index": 1,
+          "start_utc": "2024-03-20T18:49:23+00:00",
+          "end_utc": "2024-03-21T18:49:23+00:00",
+          "has_observed_transactions": true
+        },
+        {
+          "window_index": 2,
+          "start_utc": "2024-03-21T18:49:23+00:00",
+          "end_utc": "2024-03-22T18:49:23+00:00",
+          "has_observed_transactions": true
+        },
+        {
+          "window_index": 3,
+          "start_utc": "2024-03-22T18:49:23+00:00",
+          "end_utc": "2024-03-23T18:49:23+00:00",
+          "has_observed_transactions": true
+        },
+        {
+          "window_index": 4,
+          "start_utc": "2024-03-23T18:49:23+00:00",
+          "end_utc": "2024-03-24T18:49:23+00:00",
+          "has_observed_transactions": true
+        },
+        {
+          "window_index": 5,
+          "start_utc": "2024-03-24T18:49:23+00:00",
+          "end_utc": "2024-03-25T18:49:23+00:00",
+          "has_observed_transactions": true
+        },
+        {
+          "window_index": 6,
+          "start_utc": "2024-03-25T18:49:23+00:00",
+          "end_utc": "2024-03-26T18:49:23+00:00",
+          "has_observed_transactions": true
+        },
+        {
+          "window_index": 7,
+          "start_utc": "2024-03-26T18:49:23+00:00",
+          "end_utc": "2024-03-27T18:49:23+00:00",
+          "has_observed_transactions": true
+        },
+        {
+          "window_index": 8,
+          "start_utc": "2024-03-27T18:49:23+00:00",
+          "end_utc": "2024-03-28T18:49:23+00:00",
+          "has_observed_transactions": true
+        },
+        {
+          "window_index": 9,
+          "start_utc": "2024-03-28T18:49:23+00:00",
+          "end_utc": "2024-03-29T18:49:23+00:00",
+          "has_observed_transactions": true
+        }
+      ]
+    }
+  },
+  "limitations": [
+    "Graph topology features are pending TV1-05 and remain NaN.",
+    "The dataset consists of sparse time samples; empty windows mean no sampled transaction was observed.",
+    "Train uses train_graph_transactions.parquet to exclude held-out addresses from the training graph/features.",
+    "Validation/Test use cumulative chronological history."
+  ],
+  "scaler": {
+    "path": "artifacts\\scalers\\feature_robust_scaler.joblib",
+    "fit_split": "train",
+    "method": "RobustScaler",
+    "columns": [
+      "total_eth_sent",
+      "total_eth_received",
+      "net_balance_diff",
+      "avg_eth_sent",
+      "max_eth_sent",
+      "avg_eth_received",
+      "max_eth_received",
+      "tx_sent_count",
+      "tx_recv_count",
+      "sent_recv_ratio",
+      "zero_val_tx_ratio",
+      "failed_tx_ratio",
+      "active_duration_hours",
+      "tx_frequency_per_day",
+      "mean_inter_tx_time",
+      "std_inter_tx_time",
+      "burstiness_index",
+      "recent_volume_spike_ratio",
+      "recent_tx_spike_ratio"
+    ]
+  }
+}

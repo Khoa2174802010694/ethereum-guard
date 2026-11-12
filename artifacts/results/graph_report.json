@@ -1,0 +1,247 @@
+{
+  "status": "success",
+  "method": "directed_transaction_graph",
+  "node_features": 25,
+  "node_feature_groups": {
+    "x_tab": [
+      "total_eth_sent",
+      "total_eth_received",
+      "net_balance_diff",
+      "avg_eth_sent",
+      "max_eth_sent",
+      "avg_eth_received",
+      "max_eth_received",
+      "tx_sent_count",
+      "tx_recv_count",
+      "sent_recv_ratio",
+      "zero_val_tx_ratio",
+      "failed_tx_ratio"
+    ],
+    "x_topo": [
+      "in_degree",
+      "out_degree",
+      "unique_in_neighbors",
+      "unique_out_neighbors",
+      "neighbor_repeat_ratio",
+      "local_ego_density"
+    ],
+    "x_temp_stat": [
+      "active_duration_hours",
+      "tx_frequency_per_day",
+      "mean_inter_tx_time",
+      "std_inter_tx_time",
+      "burstiness_index",
+      "recent_volume_spike_ratio",
+      "recent_tx_spike_ratio"
+    ]
+  },
+  "snapshot_fields": [
+    "x",
+    "x_tab",
+    "x_topo",
+    "x_temp_stat",
+    "temporal_seq",
+    "edge_index",
+    "edge_attr",
+    "edge_timestamp",
+    "y",
+    "eval_mask",
+    "node_id",
+    "addresses"
+  ],
+  "edge_features": [
+    "tx_count_log",
+    "total_value_log",
+    "mean_value_log",
+    "last_tx_age_norm",
+    "avg_gas_log"
+  ],
+  "graph_features": [
+    "in_degree",
+    "out_degree",
+    "unique_in_neighbors",
+    "unique_out_neighbors",
+    "neighbor_repeat_ratio",
+    "local_ego_density"
+  ],
+  "edge_direction": "from_address -> to_address",
+  "edge_aggregation": "one directed edge per ordered address pair",
+  "degree_definition": "in_degree/out_degree are transaction multiplicities; unique_in/out_neighbors count distinct counterparties.",
+  "neighbor_repeat_ratio_definition": "1 - (unique_in_neighbors + unique_out_neighbors) / (in_degree + out_degree + 1), clipped to [0,1].",
+  "local_ego_density_definition": "Directed induced 1-hop ego density including center node; m/(k*(k-1)); self-loops excluded.",
+  "inductive_policy": "Train uses train_graph_transactions only. Validation and Test use cumulative chronological transaction partitions.",
+  "graph_feature_scaler": {
+    "path": "artifacts\\scalers\\graph_feature_scaler.joblib",
+    "fit_split": "train",
+    "method": "RobustScaler",
+    "columns": [
+      "in_degree",
+      "out_degree",
+      "unique_in_neighbors",
+      "unique_out_neighbors",
+      "neighbor_repeat_ratio",
+      "local_ego_density"
+    ]
+  },
+  "splits": {
+    "train": {
+      "split": "train",
+      "nodes": 1016762,
+      "directed_edges": 1064255,
+      "edge_attributes_shape": [
+        1064255,
+        5
+      ],
+      "node_features_shape": [
+        1016762,
+        25
+      ],
+      "temporal_sequence_shape": [
+        1016762,
+        10,
+        8
+      ],
+      "eval_nodes": 111,
+      "x_tab_shape": [
+        1016762,
+        12
+      ],
+      "x_topo_shape": [
+        1016762,
+        6
+      ],
+      "x_temp_stat_shape": [
+        1016762,
+        7
+      ],
+      "edge_timestamp_shape": [
+        1064255
+      ],
+      "stable_node_ids_unique": true,
+      "input_transactions": 1452950,
+      "aggregated_directed_edges": 1064255,
+      "edges_after_node_mapping": 1064255,
+      "cutoff_utc": "2024-03-14T17:53:23+00:00",
+      "topology": {
+        "ego_density_computed": true,
+        "ego_nodes_processed": 1011915,
+        "ego_edges_counted": 2164506,
+        "algorithm": "numba_sparse_intersection",
+        "definition": "Directed induced 1-hop ego density; closed undirected neighborhood membership; original directed edges as numerator; denominator k*(k-1); self-loops excluded.",
+        "chunk_size": 100000,
+        "degree_definition": "in_degree/out_degree count transaction multiplicity; unique_in/out_neighbors count distinct counterparties."
+      },
+      "graph_path": "data\\processed\\graphs\\train\\graph.pt",
+      "snapshot_path": "data\\processed\\graphs\\train\\snapshot_train.pt",
+      "nodes_path": "data\\processed\\graphs\\train\\nodes.parquet"
+    },
+    "val": {
+      "split": "val",
+      "nodes": 1528608,
+      "directed_edges": 1632692,
+      "edge_attributes_shape": [
+        1632692,
+        5
+      ],
+      "node_features_shape": [
+        1528608,
+        25
+      ],
+      "temporal_sequence_shape": [
+        1528608,
+        10,
+        8
+      ],
+      "eval_nodes": 124,
+      "x_tab_shape": [
+        1528608,
+        12
+      ],
+      "x_topo_shape": [
+        1528608,
+        6
+      ],
+      "x_temp_stat_shape": [
+        1528608,
+        7
+      ],
+      "edge_timestamp_shape": [
+        1632692
+      ],
+      "stable_node_ids_unique": true,
+      "input_transactions": 2199725,
+      "aggregated_directed_edges": 1632692,
+      "edges_after_node_mapping": 1632692,
+      "cutoff_utc": "2024-03-22T06:50:23+00:00",
+      "topology": {
+        "ego_density_computed": true,
+        "ego_nodes_processed": 1522530,
+        "ego_edges_counted": 3329843,
+        "algorithm": "numba_sparse_intersection",
+        "definition": "Directed induced 1-hop ego density; closed undirected neighborhood membership; original directed edges as numerator; denominator k*(k-1); self-loops excluded.",
+        "chunk_size": 100000,
+        "degree_definition": "in_degree/out_degree count transaction multiplicity; unique_in/out_neighbors count distinct counterparties."
+      },
+      "graph_path": "data\\processed\\graphs\\val\\graph.pt",
+      "snapshot_path": "data\\processed\\graphs\\val\\snapshot_val.pt",
+      "nodes_path": "data\\processed\\graphs\\val\\nodes.parquet"
+    },
+    "test": {
+      "split": "test",
+      "nodes": 1791594,
+      "directed_edges": 1923360,
+      "edge_attributes_shape": [
+        1923360,
+        5
+      ],
+      "node_features_shape": [
+        1791594,
+        25
+      ],
+      "temporal_sequence_shape": [
+        1791594,
+        10,
+        8
+      ],
+      "eval_nodes": 125,
+      "x_tab_shape": [
+        1791594,
+        12
+      ],
+      "x_topo_shape": [
+        1791594,
+        6
+      ],
+      "x_temp_stat_shape": [
+        1791594,
+        7
+      ],
+      "edge_timestamp_shape": [
+        1923360
+      ],
+      "stable_node_ids_unique": true,
+      "input_transactions": 2590362,
+      "aggregated_directed_edges": 1923360,
+      "edges_after_node_mapping": 1923360,
+      "cutoff_utc": "2024-03-29T18:49:23+00:00",
+      "topology": {
+        "ego_density_computed": true,
+        "ego_nodes_processed": 1784558,
+        "ego_edges_counted": 3925432,
+        "algorithm": "numba_sparse_intersection",
+        "definition": "Directed induced 1-hop ego density; closed undirected neighborhood membership; original directed edges as numerator; denominator k*(k-1); self-loops excluded.",
+        "chunk_size": 100000,
+        "degree_definition": "in_degree/out_degree count transaction multiplicity; unique_in/out_neighbors count distinct counterparties."
+      },
+      "graph_path": "data\\processed\\graphs\\test\\graph.pt",
+      "snapshot_path": "data\\processed\\graphs\\test\\snapshot_test.pt",
+      "nodes_path": "data\\processed\\graphs\\test\\nodes.parquet"
+    }
+  },
+  "limitations": [
+    "Exact local ego density can be CPU-intensive for million-node graphs.",
+    "The source data are sparse temporal samples, not continuous chain history.",
+    "is_contract is not inferred because the source does not provide it.",
+    "Validation/Test cumulative histories include prior transactions for held-out addresses; the evaluation protocol must explicitly permit this transductive history or be tightened."
+  ]
+}

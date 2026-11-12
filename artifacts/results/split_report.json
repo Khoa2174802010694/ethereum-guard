@@ -1,0 +1,102 @@
+{
+  "status": "success",
+  "method": "Global chronological transaction-row split. Timestamps are sorted across all input Parquet files; cutoffs are selected at cumulative train and train+validation row quantiles.",
+  "config": {
+    "path": "configs\\default.yaml",
+    "random_seed": 42,
+    "train_ratio": 0.7,
+    "val_ratio": 0.15,
+    "test_ratio": 0.15,
+    "inductive_holdout_ratio": 0.1,
+    "batch_size": 100000
+  },
+  "input": {
+    "directory": "data\\processed\\transactions",
+    "files": [
+      "ethereum__transactions__02640567_to_02765542.parquet",
+      "ethereum__transactions__14666567_to_14791542.parquet",
+      "ethereum__transactions__18416567_to_18541542.parquet",
+      "ethereum__transactions__19416567_to_19541542.parquet"
+    ],
+    "total_transactions": 2618597
+  },
+  "cutoffs": {
+    "T_train_unix": 1710438803,
+    "T_train_utc": "2024-03-14T17:53:23+00:00",
+    "T_val_unix": 1711090223,
+    "T_val_utc": "2024-03-22T06:50:23+00:00",
+    "T_test_unix": 1711738163,
+    "T_test_utc": "2024-03-29T18:49:23+00:00"
+  },
+  "period_partitions": {
+    "train": {
+      "path": "data\\processed\\splits\\train_transactions.parquet",
+      "rows": 1833120
+    },
+    "val": {
+      "path": "data\\processed\\splits\\val_transactions.parquet",
+      "rows": 392844
+    },
+    "test": {
+      "path": "data\\processed\\splits\\test_transactions.parquet",
+      "rows": 392633
+    }
+  },
+  "actual_ratios": {
+    "train": 0.7000389903448297,
+    "val": 0.15002079357762954,
+    "test": 0.14994021607754077
+  },
+  "train_graph_partition": {
+    "path": "data\\processed\\splits\\train_graph_transactions.parquet",
+    "input_rows": 1833120,
+    "retained_rows": 1475581,
+    "removed_rows": 357539,
+    "holdout_addresses": 179160
+  },
+  "address_split_summary": {
+    "unique_addresses": 1791594,
+    "inductive_holdout_ratio_requested": 0.1,
+    "inductive_holdout_addresses": 179160,
+    "inductive_holdout_ratio_actual": 0.10000033489730374,
+    "inductive_holdout_active_in_test": 32671,
+    "inductive_holdout_active_in_train_period": 124457,
+    "labels": {
+      "known_phishing": 125,
+      "verified_normal": 0,
+      "unlabeled": 1791469
+    },
+    "active_addresses_by_period": {
+      "train": 1245709,
+      "val": 329753,
+      "test": 325581
+    },
+    "known_phishing_by_period": {
+      "train": 123,
+      "val": 1,
+      "test": 1
+    },
+    "note": "The holdout set is a deterministic random sample of unique addresses from the available sample. Every train-period edge touching one of these addresses is removed from the train graph. is_inductive_test marks held-out addresses active in the test period. is_new_after_train_cutoff is a separate temporal property."
+  },
+  "anti_leakage_rules": [
+    "Raw train/val/test period partitions are disjoint and chronological.",
+    "Train graph uses train_graph_transactions.parquet, not the raw train partition.",
+    "Every train-period transaction touching a held-out address is excluded from the train graph.",
+    "Validation/test period partitions are retained unfiltered for later cumulative snapshots.",
+    "Build each snapshot only from transactions with timestamp <= its cutoff.",
+    "Fit feature scalers on train only; transform validation/test.",
+    "Do not convert label -1 into verified normal label 0.",
+    "is_inductive_test identifies held-out addresses active in the test period."
+  ],
+  "limitations": [
+    "The input consists of four sparse time samples, not continuous Ethereum history.",
+    "The 70/15/15 ratio applies to transaction rows, not unique addresses.",
+    "Random holdout is an experimental node holdout over addresses present in the available sample; it is not a true future-arrival cohort.",
+    "Because the samples are sparse, empty temporal windows cannot automatically be interpreted as confirmed zero activity."
+  ],
+  "outputs": {
+    "address_splits": "data\\processed\\splits\\address_splits.parquet",
+    "train_graph_transactions": "data\\processed\\splits\\train_graph_transactions.parquet",
+    "report": "artifacts\\results\\split_report.json"
+  }
+}

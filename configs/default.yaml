@@ -1,0 +1,28 @@
+
+project:
+  name: ethereum-guard
+  random_seed: 42
+
+data:
+  source: vnegi10/Ethereum_blockchain_parquet
+  raw_dir: data/raw
+  sample_dir: data/sample
+  processed_dir: data/processed
+
+split:
+  train_ratio: 0.70
+  val_ratio: 0.15
+  test_ratio: 0.15
+  inductive_holdout_ratio: 0.10
+
+temporal:
+  num_windows: 10
+  window_size_hours: 24
+
+pipeline:
+  batch_size: 100000
+
+output:
+  artifacts_dir: artifacts
+  results_dir: artifacts/results
+  checkpoints_dir: artifacts/checkpoints

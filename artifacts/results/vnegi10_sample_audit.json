@@ -1,0 +1,52 @@
+{
+  "dataset": "vnegi10 Ethereum Blockchain Parquet",
+  "transactions": {
+    "file": "ethereum__transactions__02640567_to_02765542.parquet",
+    "rows": 37442,
+    "missing_columns": [],
+    "null_counts": {
+      "value_f64": 0,
+      "success": 0,
+      "to_address": 140,
+      "transaction_index": 0,
+      "from_address": 0,
+      "block_number": 0,
+      "gas_price": 0,
+      "gas_used": 0,
+      "transaction_hash": 0
+    },
+    "unique_transaction_hashes": 37442,
+    "duplicate_hashes": 0,
+    "unique_senders": 9170,
+    "unique_receivers": 11892,
+    "success_distribution": {
+      "True": 36911,
+      "False": 531
+    },
+    "block_min": "2640617",
+    "block_max": "2765517",
+    "value_min": 0.0,
+    "value_max": 2e+23
+  },
+  "blocks": {
+    "file": "ethereum__blocks__02640567_to_02765542.parquet",
+    "rows": 5000,
+    "unique_blocks": 5000,
+    "duplicate_blocks": 0,
+    "block_min": 2640567,
+    "block_max": 2765542,
+    "timestamp_min": 1479343208,
+    "timestamp_max": 1481132112,
+    "block_intervals": {
+      "25": 4999
+    }
+  },
+  "join": {
+    "total_transactions": 37442,
+    "matched_transactions": 37442,
+    "unmatched_transactions": 0,
+    "match_rate_percent": 100.0,
+    "unique_transaction_blocks": 2623,
+    "unique_block_records": 5000
+  }
+}

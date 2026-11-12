@@ -1,0 +1,44 @@
+{
+    "pipeline": "ETHEREUM GUARD TV1-02",
+    "input_directory": "C:\\Users\\minhk\\Downloads\\ethereum-guard\\data\\sample",
+    "output_directory": "C:\\Users\\minhk\\Downloads\\ethereum-guard\\data\\processed\\transactions",
+    "transaction_files": 4,
+    "indexed_blocks": 20000,
+    "total_transactions": 2618597,
+    "null_to_address": 2115,
+    "files": [
+        {
+            "source_file": "ethereum__transactions__02640567_to_02765542.parquet",
+            "output_file": "ethereum__transactions__02640567_to_02765542.parquet",
+            "rows": 37442,
+            "null_to_address": 140,
+            "missing_block_timestamp": 0,
+            "value_mismatches": 0
+        },
+        {
+            "source_file": "ethereum__transactions__14666567_to_14791542.parquet",
+            "output_file": "ethereum__transactions__14666567_to_14791542.parquet",
+            "rows": 909819,
+            "null_to_address": 637,
+            "missing_block_timestamp": 0,
+            "value_mismatches": 0
+        },
+        {
+            "source_file": "ethereum__transactions__18416567_to_18541542.parquet",
+            "output_file": "ethereum__transactions__18416567_to_18541542.parquet",
+            "rows": 753668,
+            "null_to_address": 723,
+            "missing_block_timestamp": 0,
+            "value_mismatches": 0
+        },
+        {
+            "source_file": "ethereum__transactions__19416567_to_19541542.parquet",
+            "output_file": "ethereum__transactions__19416567_to_19541542.parquet",
+            "rows": 917668,
+            "null_to_address": 615,
+            "missing_block_timestamp": 0,
+            "value_mismatches": 0
+        }
+    ],
+    "label_assignment": "Not performed during ingestion"
+}
