@@ -385,13 +385,13 @@ streamlit run src/app/dashboard.py
 
 | Mã Task | Tên Task | Nội dung chi tiết | Đầu ra nghiệm thu |
 | :--- | :--- | :--- | :--- |
-| **TV1-01** | Data Contract & Sample | Cùng nhóm chốt `src/schemas.py` và trích xuất bộ `data/sample/` (1.000 ví) ngay trong 3 ngày đầu. | `src/schemas.py`, `data/sample/` |
-| **TV1-02** | Ingestion & Cleaning | Viết `src/pipeline/ingest.py`: xử lý null, chuẩn hóa địa chỉ `0x` chữ thường, đổi Wei sang ETH, lọc bản ghi lỗi. | `ingest.py` chạy sạch trên dữ liệu thật |
-| **TV1-03** | Temporal & Inductive Split | Chia dữ liệu theo 3 mốc cắt thời gian $T_{\text{train}} < T_{\text{val}} < T_{\text{test}}$ (70% / 15% / 15%) và tách tập ví mới (Unseen-Address). | Hàm `create_splits()` không rò rỉ dữ liệu |
-| **TV1-04** | Feature Engineering (25 đặc trưng) | Tính 25 đặc trưng chia làm 3 nhóm độc lập (`TABULAR_TX_COLS`, `GRAPH_TOPO_COLS`, `TEMPORAL_STAT_COLS`) và chuỗi cửa sổ thời gian. | `nodes_{split}.parquet`, `temporal_{split}.pt` |
-| **TV1-05** | PyG Snapshot Graph Builder | Xây dựng 3 đồ thị có hướng `snapshot_{split}.pt` kèm `edge_timestamp` và chuẩn hóa bằng `RobustScaler` (chỉ fit trên train). | `src/pipeline/graph_builder.py`, `snapshot_{split}.pt` |
-| **TV1-06** | Live Etherscan Adapter | Viết hàm lấy giao dịch gần nhất của 1 địa chỉ ví qua Etherscan API và ghép nối Hybrid với DB có sẵn để phục vụ demo live. | Hàm `fetch_live_wallet_features(address)` |
-| **TV1-07** | EDA & Báo cáo Chương 3–4 | Thực hiện notebook EDA và viết Chương 3 (Dataset) & Chương 4 (Feature & Graph Construction) của báo cáo. | `01_eda_and_graph_stats.ipynb`, Chương 3–4 |
+[x]| **TV1-01** | Data Contract & Sample | Cùng nhóm chốt `src/schemas.py` và trích xuất bộ `data/sample/` (1.000 ví) ngay trong 3 ngày đầu. | `src/schemas.py`, `data/sample/` |
+[x]| **TV1-02** | Ingestion & Cleaning | Viết `src/pipeline/ingest.py`: xử lý null, chuẩn hóa địa chỉ `0x` chữ thường, đổi Wei sang ETH, lọc bản ghi lỗi. | `ingest.py` chạy sạch trên dữ liệu thật |
+[x]| **TV1-03** | Temporal & Inductive Split | Chia dữ liệu theo 3 mốc cắt thời gian $T_{\text{train}} < T_{\text{val}} < T_{\text{test}}$ (70% / 15% / 15%) và tách tập ví mới (Unseen-Address). | Hàm `create_splits()` không rò rỉ dữ liệu |
+[x]| **TV1-04** | Feature Engineering (25 đặc trưng) | Tính 25 đặc trưng chia làm 3 nhóm độc lập (`TABULAR_TX_COLS`, `GRAPH_TOPO_COLS`, `TEMPORAL_STAT_COLS`) và chuỗi cửa sổ thời gian. | `nodes_{split}.parquet`, `temporal_{split}.pt` |
+[x]| **TV1-05** | PyG Snapshot Graph Builder | Xây dựng 3 đồ thị có hướng `snapshot_{split}.pt` kèm `edge_timestamp` và chuẩn hóa bằng `RobustScaler` (chỉ fit trên train). | `src/pipeline/graph_builder.py`, `snapshot_{split}.pt` |
+[x]| **TV1-06** | Live Etherscan Adapter | Viết hàm lấy giao dịch gần nhất của 1 địa chỉ ví qua Etherscan API và ghép nối Hybrid với DB có sẵn để phục vụ demo live. | Hàm `fetch_live_wallet_features(address)` |
+[x]| **TV1-07** | EDA & Báo cáo Chương 3–4 | Thực hiện notebook EDA và viết Chương 3 (Dataset) & Chương 4 (Feature & Graph Construction) của báo cáo. | `01_eda_and_graph_stats.ipynb`, Chương 3–4 |
 
 ## 5.2. Thành viên 2 — ML / GNN Core Engineer
 

@@ -123,7 +123,7 @@ def read_transactions(paths: list[Path], columns: list[str]) -> pd.DataFrame:
         del table
     if not frames:
         return pd.DataFrame(columns=columns)
-    frame = pd.concat(frames, ignore_index=True, copy=False)
+    frame = pd.concat(frames, ignore_index=True)
     del frames
     return frame
 
@@ -201,7 +201,7 @@ def compute_tabular_and_temporal(
         raise ValueError("Không có giao dịch trước cutoff.")
 
     outgoing, incoming = make_event_tables(tx)
-    events = pd.concat([outgoing, incoming], ignore_index=True, copy=False)
+    events = pd.concat([outgoing, incoming], ignore_index=True)
     events["is_zero"] = events["value_eth"].eq(0).astype(np.int8)
     events["is_failed"] = (~events["success"]).astype(np.int8)
 
@@ -215,7 +215,8 @@ def compute_tabular_and_temporal(
         zero_count=("is_zero", "sum"),
         failed_count=("is_failed", "sum"),
     )
-    wide = agg.unstack("direction", fill_value=0.0)
+    wide = agg.unstack("direction")
+    wide = wide.fillna(0.0)
     wide.columns = [f"{metric}_{direction}" for metric, direction in wide.columns]
     wide = wide.fillna(0.0)
 
@@ -357,7 +358,8 @@ def compute_tabular_and_temporal(
             count=("value_eth", "size"),
             value_sum=("value_eth", "sum"),
         )
-        .unstack("direction", fill_value=0.0)
+        .unstack("direction")
+        .fillna(0.0)
     )
     directional.columns = [
         f"{metric}_{direction}" for metric, direction in directional.columns
@@ -377,10 +379,13 @@ def compute_tabular_and_temporal(
 
     # Build compact MultiIndex table then scatter into dense tensor.
     seq_table = pd.DataFrame(index=seq_agg.index)
-    seq_table["tx_in_count"] = directional.get(("count", "in"), 0.0)
-    seq_table["tx_out_count"] = directional.get(("count", "out"), 0.0)
-    seq_table["val_in_sum"] = directional.get(("value_sum", "in"), 0.0)
-    seq_table["val_out_sum"] = directional.get(("value_sum", "out"), 0.0)
+    # Columns were flattened above to strings such as "count_in".
+    # Looking them up with ("count", "in") silently returned scalar 0.0,
+    # which erased all directional temporal counts and value sums.
+    seq_table["tx_in_count"] = directional.get("count_in", 0.0)
+    seq_table["tx_out_count"] = directional.get("count_out", 0.0)
+    seq_table["val_in_sum"] = directional.get("value_sum_in", 0.0)
+    seq_table["val_out_sum"] = directional.get("value_sum_out", 0.0)
     seq_table["val_max"] = seq_agg["value_max"]
     seq_table["unique_counterparties"] = seq_agg["unique_counterparties"]
     seq_table["avg_gas_price"] = seq_agg["avg_gas_price"]

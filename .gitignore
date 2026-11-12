@@ -35,3 +35,6 @@ artifacts/scalers/
 # OS
 .DS_Store
 Thumbs.db
+
+# Local backups
+artifacts/backup_before_feature_rebuild/

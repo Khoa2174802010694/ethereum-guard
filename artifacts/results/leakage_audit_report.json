@@ -1,0 +1,51 @@
+{
+  "status": "PASS",
+  "partition_bounds_unix": {
+    "train": {
+      "min": 1479343893,
+      "max": 1710438803,
+      "rows": 1833120
+    },
+    "val": {
+      "min": 1710439103,
+      "max": 1711090223,
+      "rows": 392844
+    },
+    "test": {
+      "min": 1711090523,
+      "max": 1711738163,
+      "rows": 392633
+    }
+  },
+  "cutoffs_unix": {
+    "train": 1710438803,
+    "val": 1711090223,
+    "test": 1711738163
+  },
+  "holdout_addresses": 179160,
+  "train_graph_rows": 1475581,
+  "train_graph_holdout_edge_violations": 0,
+  "train_graph_max_timestamp": 1710438803,
+  "snapshots": {
+    "train": {
+      "nodes": 1016762,
+      "edges": 1064255,
+      "max_edge_timestamp": 1710438803
+    },
+    "val": {
+      "nodes": 1528608,
+      "edges": 1632692,
+      "max_edge_timestamp": 1711090223
+    },
+    "test": {
+      "nodes": 1791594,
+      "edges": 1923360,
+      "max_edge_timestamp": 1711738163
+    }
+  },
+  "notes": [
+    "This audit verifies chronology, train holdout-edge exclusion, and snapshot edge timestamp cutoffs.",
+    "It does not prove that every engineered node feature is free of future information; feature-history windows require a separate audit.",
+    "Validation/Test snapshots intentionally use cumulative chronological history under the current protocol."
+  ]
+}
